@@ -8,32 +8,63 @@ import firebaseConfig from './firebase.config';
 firebase.initializeApp(firebaseConfig);//from documentation
 //by default useState e empty object rkhr jnno ...jhtu authorize kore user e empty object jcce
 function App() {
+  const [newUser,setNewUser] = useState(false)//jhtu ekta user tai false...for toggle checkbox
   const [user,setUser] = useState({
     isSignedIn : false,
     name : '',
     email: '',
     photo:'',
+    error: '',
+    password:''
   })
 
-  const provider = new firebase.auth.GoogleAuthProvider();
+   
+
+  const fbProvider = new firebase.auth.FacebookAuthProvider();//signInWithPopup r vitor parameter hisebe pass kora holo
+  console.log(fbProvider);
    
   const handleSignin = () => {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    firebase.auth().signInWithPopup(provider)//google r ontorgoto firebase auth popup use kore amra sign in korar system ta k call korchi
+    const googleprovider = new firebase.auth.GoogleAuthProvider();
+    firebase.auth().signInWithPopup(googleprovider)//google r ontorgoto firebase auth popup use kore amra sign in korar system ta k call korchi
     .then(res =>{//ora response ta k json format ei dey tai amdr r res.json korar proyojon hyni
       const {displayName,photoURL,email} = res.user;//res e thaka user r property gulo destructure 
       const signedInUser = {//signedInUser ekti object
           isSignedInUser : true,
           name: displayName,
           email: email,
-          photo: photoURL,
+          photo: photoURL
       }
       setUser(signedInUser);
     })
+
     .catch(err =>{//kno karon e error kheye gele amra console log korchi
        console.log(err)
        console.log(err.message)
       });
+  }
+
+  const handleFbSignIn = () =>{
+    firebase.auth().signInWithPopup(fbProvider)
+    .then(result => {
+      // This gives you a Facebook Access Token. You can use it to access the Facebook API.
+      var token = result.credential.accessToken;
+      // The signed-in user info.
+      var user = result.user;
+
+      console.log('fb-user after sign in',user)
+      // ...
+    })
+    .catch(error=> {
+      // Handle Errors here.
+      var errorCode = error.code;
+      var errorMessage = error.message;
+  
+      // The email of the user's account used.
+      var email = error.email;
+      // The firebase.auth.AuthCredential type that was used.
+      var credential = error.credential;
+      // ...
+    });
   }
 
   const handleSignOut = () =>{
@@ -45,7 +76,10 @@ function App() {
         photo: '',
         password: '',//dhore nilam by default password hcce empty string
         email: '',
+        error: '',
+        success: false
       }
+
       setUser(signedOutUser);//empty user pass kora holo
     })
 
@@ -77,21 +111,54 @@ if(e.target.name === 'password'){//ager line r moto
     }
 
 const handleSubmit = (e) =>{
-  
-   if(user.email && user.password){//ei duita value valid hye thkle checked hye tbei tmr submit ta hbe..amra email ebong pass r value peye state update korci
+   if( newUser && user.email && user.password){//jdi newUser true hy ebong ei duita value valid hye thkle checked hye tbei tmr submit ta hbe..amra email ebong pass r value peye state update korci
     firebase.auth().createUserWithEmailAndPassword(user.email,user.password)
-    .then((user) => {
-      // Signed in 
-      // ...
+    .then((res) => {
+      const newUserInfo = {...user}//user ekti object so...newuserInfo hcce object
+       newUserInfo.error = '';
+       newUserInfo.success = true;
+       setUser(newUserInfo);
+       updateUserName(user.name)
     })
-    .catch((error) => {
-      var errorCode = error.code;
-      var errorMessage = error.message;
-      console.log(errorCode, errorMessage);
-      // ..
+
+    .catch(error => {
+      const newUserInfo = {...user};
+      newUserInfo.error = error.message;
+      newUserInfo.success = false;
+      setUser(newUserInfo);
     });
    }
+
+   if(!newUser && user.email && user.password){
+     firebase.auth().signInWithEmailAndPassword(user.email, user.password)
+  .then(res => {
+    const newUserInfo = {...user}//user ekti object so...newuserInfo hcce object
+       newUserInfo.error = '';
+       newUserInfo.success = true;
+       setUser(newUserInfo)
+       console.log('Sign in user info',res.user)
+  })
+  .catch((error) => {
+    const newUserInfo = {...user};
+      newUserInfo.error = error.message;
+      newUserInfo.success = false;
+      setUser(newUserInfo);
+  });
+ 
+   }
    e.preventDefault();//default behaviour avoid krar jnno
+}
+
+const updateUserName = (name) =>{
+  const user = firebase.auth().currentUser;
+
+  user.updateProfile({//user.updateProfile hcce ekta object
+    displayName: name,
+}).then(function() {
+  console.log('user name updated successfully')
+}).catch(function(error) {
+  console.log(error)
+  });
 }
 
 return (
@@ -100,8 +167,10 @@ return (
         user.isSignedIn ? <button onClick={handleSignOut}>Sign Out</button> :
         <button onClick={handleSignin}>Sign In</button>
       }
-      {
-        user.isSignedIn = true && <div>
+       <br/>
+      <button onClick={handleFbSignIn}> Sign In Using Facebook </button>
+      {user.isSignedIn = true && 
+        <div>
           <h1>Welcome: {user.name}</h1>
           <h1>Email: {user.email}</h1>
           <img src={user.photo} alt=""/>
@@ -109,12 +178,18 @@ return (
       }
 
           <h1>Our own authentication</h1>
+          {/* !newUser er mane holo aghe jdi newUser ta true thake false koro..false hole true orthat toggle */}
+           <input type='checkbox' onChange={()=>setNewUser(!newUser)} name='newUser' in=''/>
+      {/* newUser toggle howa mame tru false true false howa r nicher line gula change howa */}
+           <label htmlFor='newUser'>new User Sign Up</label>
           <p>Name: {user.name}</p>
            <p>Email: {user.email}</p>
           <p>Password: {user.password}</p>
          {/* form r action hcce onSubmit */}
       <form onSubmit={handleSubmit}>
-           <input name="name" type="text" onBlur={handleBlur} placeholder="Your Name"/>
+          { //newuser true hlei input field ta dkhaba setNewUser call kore kore true r false kora hcche..
+          newUser && <input name="name" type="text" onBlur={handleBlur} placeholder="Your Name"/>
+          }
            <br/>
          {/* onchange use kora mane input field tir kno kcu change hle ekta event hbe r event ti holo tar mddhe parameter hisebe thaka handleChange function call kora */}
       <input type="text" name='email' onBlur={handleBlur} placeholder="Your Email Address" required/>
@@ -123,8 +198,12 @@ return (
       <input type="password" onBlur={handleBlur} name='password' id='' placeholder="Password" required/>
         <br/>
          {/* input hisebe submit puro form ta k puron kore submit nibe..ja btn submit kore na..r eta form tag r vitor hlei kj krbe  */}
-      <input type="submit" value="submit"/>
+      <input type="submit" value={newUser ? 'Sign Up' : 'Sign In'}/>
          </form>
+         <p style={{color:'red'}}>{user.error}</p>
+         {
+           user.success && <p style={{color: 'Green'}}>User {newUser ?'Created' : 'Loggen In'} Sussessfully</p>
+         }
     </div>
   );
 }
@@ -140,5 +219,5 @@ export default App;
 //kno ekta array k amra rekta array r sthe add korte chaile array ta k amra ...operator diye copy kori trpr bosaya dei
 //React kno state k ekbare update kore na..borong copy kore niye eshe state update kore
 //submit r rekta kj hcce tumi jdi kno ekta form k submit koro thle default hisebe se puro page ta k submit kre deyy
-
+//new user hle create koro r na hle sign in koro
 
